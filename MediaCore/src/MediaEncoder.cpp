@@ -665,7 +665,11 @@ private:
         m_logger->Log(DEBUG) << "Choose to use video encoder '" << m_videnc->name << "'." << endl;
         m_logger->Log(DEBUG) << "Choose to use encoding pixel-format '" << av_get_pix_fmt_name(m_videncPixfmt) << "'." << endl;
 
+#if IMGUI_VULKAN_SHADER
         m_imgCvter.SetUseVulkanConverter(true);
+#else
+        m_imgCvter.SetUseVulkanConverter(false);
+#endif
         if (!m_imgCvter.SetOutSize(width, height))
         {
             ostringstream oss;
@@ -708,14 +712,26 @@ private:
         *ppVidencCtx = nullptr;
 
         AVPixelFormat videncPixfmt = AV_PIX_FMT_NONE;
-        if (videnc->pix_fmts)
+        const AVPixelFormat* pix_fmts = nullptr;
+        int num_pix_fmts = 0;
+#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 3, 100)
+        avcodec_get_supported_config(nullptr, videnc, AV_CODEC_CONFIG_PIX_FORMAT, 0, (const void**)&pix_fmts, &num_pix_fmts);
+#else
+        pix_fmts = videnc->pix_fmts;
+        if (pix_fmts) {
+            while (pix_fmts[num_pix_fmts] != AV_PIX_FMT_NONE) {
+                num_pix_fmts++;
+            }
+        }
+#endif
+        if (pix_fmts && num_pix_fmts > 0)
         {
             if (requiredInputPixfmt == AV_PIX_FMT_NONE)
             {
                 bool isHwEncoder = (videnc->capabilities&AV_CODEC_CAP_HARDWARE) != 0;
-                for (int i = 0; ; i++)
+                for (int i = 0; i < num_pix_fmts; i++)
                 {
-                    AVPixelFormat pixfmt = videnc->pix_fmts[i];
+                    AVPixelFormat pixfmt = pix_fmts[i];
                     if (pixfmt == AV_PIX_FMT_NONE)
                         break;
                     const AVPixFmtDescriptor* pixdesc = av_pix_fmt_desc_get(pixfmt);
@@ -731,11 +747,11 @@ private:
             else
             {
                 bool isFmtSupport = false;
-                for (int i = 0; ; i++)
+                for (int i = 0; i < num_pix_fmts; i++)
                 {
-                    if (videnc->pix_fmts[i] == AV_PIX_FMT_NONE)
+                    if (pix_fmts[i] == AV_PIX_FMT_NONE)
                         break;
-                    else if (videnc->pix_fmts[i] == requiredInputPixfmt)
+                    else if (pix_fmts[i] == requiredInputPixfmt)
                     {
                         isFmtSupport = true;
                         break;
@@ -927,8 +943,20 @@ private:
         }
         else
         {
-            if (m_audenc->sample_fmts)
-                m_audencSmpfmt = m_audenc->sample_fmts[0];
+            const AVSampleFormat* sample_fmts = nullptr;
+            int num_sample_fmts = 0;
+#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 3, 100)
+            avcodec_get_supported_config(nullptr, m_audenc, AV_CODEC_CONFIG_SAMPLE_FORMAT, 0, (const void**)&sample_fmts, &num_sample_fmts);
+#else
+            sample_fmts = m_audenc->sample_fmts;
+            if (sample_fmts) {
+                while (sample_fmts[num_sample_fmts] != AV_SAMPLE_FMT_NONE) {
+                    num_sample_fmts++;
+                }
+            }
+#endif
+            if (sample_fmts && num_sample_fmts > 0)
+                m_audencSmpfmt = sample_fmts[0];
             else
                 m_audencSmpfmt = AV_SAMPLE_FMT_FLT;
         }
@@ -1088,7 +1116,11 @@ private:
             return nullptr;
         }
         int64_t pts = av_rescale_q((int64_t)(vmat.time_stamp*1000), MILLISEC_TIMEBASE, m_videncCtx->time_base);
-        m_imgCvter.ConvertImage(vmat, vfrm.get(), pts);
+        if (!m_imgCvter.ConvertImage(vmat, vfrm.get(), pts))
+        {
+            m_logger->Log(Error) << "FAILED to convert ImMat to AVFrame: " << m_imgCvter.GetError() << endl;
+            return nullptr;
+        }
         return vfrm;
     }
 
@@ -1119,13 +1151,24 @@ private:
                     else if (tNatvieData.eType == VideoFrame::NativeData::AVFRAME_HOLDER)
                         encfrm = *((SelfFreeAVFramePtr*)tNatvieData.pData);
                     else if (tNatvieData.eType == VideoFrame::NativeData::MAT)
+                    {
                         encfrm = ConvertImMatToAVFrame(*((ImGui::ImMat*)tNatvieData.pData));
+                        if (!encfrm)
+                        {
+                            m_errMsg = "FAILED to convert ImMat to AVFrame!";
+                            m_logger->Log(Error) << m_errMsg << endl;
+                            m_encErr = true;
+                            break;
+                        }
+                    }
                     else
                         m_logger->Log(Error) << "UNSUPPORTED 'VideoFrame::NativeData::Type' " << (int)tNatvieData.eType << "!" << endl;
                     if (encfrm && encfrm->format != m_videncPixfmt)
                     {
-                        ostringstream oss; oss << "INVALID encoding AVFrame pixel format, input frame has format " << encfrm->format << "(" << av_get_pix_fmt_name((AVPixelFormat)encfrm->format)
-                                << "), while the required input format is " << m_videncPixfmt << "(" << av_get_pix_fmt_name(m_videncPixfmt) << ")!";
+                        const char* input_fmt_name = av_get_pix_fmt_name((AVPixelFormat)encfrm->format);
+                        const char* req_fmt_name = av_get_pix_fmt_name(m_videncPixfmt);
+                        ostringstream oss; oss << "INVALID encoding AVFrame pixel format, input frame has format " << encfrm->format << "(" << (input_fmt_name ? input_fmt_name : "unknown")
+                                << "), while the required input format is " << m_videncPixfmt << "(" << (req_fmt_name ? req_fmt_name : "unknown") << ")!";
                         m_errMsg = oss.str();
                         throw runtime_error(m_errMsg);
                     }

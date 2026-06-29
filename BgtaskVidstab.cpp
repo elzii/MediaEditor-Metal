@@ -1322,7 +1322,8 @@ private:
             m_errMsg = oss.str(); m_pLogger->Log(Error) << m_errMsg << endl;
             return false;
         }
-        auto strInputPixfmt = string(av_get_pix_fmt_name((AVPixelFormat)pInAvfrm->format));
+        const char* pixFmtName = av_get_pix_fmt_name((AVPixelFormat)pInAvfrm->format);
+        auto strInputPixfmt = string(pixFmtName ? pixFmtName : "");
         vector<MediaCore::MediaEncoder::Option> aExtraOpts = {
             { "profile",                MediaCore::Value("high") },
             { "aspect",                 MediaCore::Value(MediaCore::Ratio(1,1)) },
