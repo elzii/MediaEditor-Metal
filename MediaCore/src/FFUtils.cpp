@@ -1632,19 +1632,22 @@ bool FFOverlayBlender::SetupFilterGraph(AVPixelFormat pixfmt, uint32_t w1, uint3
     m_filterOutputs->next = filtInOutPtr;
     m_bufSrcCtxs.push_back(filterCtx);
 
-    filterName = "out"; filterCtx = nullptr;
-    fferr = avfilter_graph_create_filter(&filterCtx, buffersink, filterName.c_str(), nullptr, nullptr, m_avfg);
-    if (fferr < 0)
+    filterName = "out"; filterCtx = avfilter_graph_alloc_filter(m_avfg, buffersink, filterName.c_str());
+    if (!filterCtx)
     {
-        oss << "FAILED when invoking 'avfilter_graph_create_filter' for OUTPUT 'out'! fferr=" << fferr << ".";
+        oss << "FAILED to allocate 'buffersink' filter context!";
         m_errMsg = oss.str();
         return false;
     }
     const AVPixelFormat out_pix_fmts[] = { AV_PIX_FMT_RGBA, (AVPixelFormat)-1 };
     fferr = av_opt_set_bin(filterCtx, "pix_fmts", (const uint8_t*)out_pix_fmts, sizeof(out_pix_fmts) - sizeof(out_pix_fmts[0]), AV_OPT_SEARCH_CHILDREN);
+    if (fferr >= 0)
+    {
+        fferr = avfilter_init_str(filterCtx, nullptr);
+    }
     if (fferr < 0)
     {
-        oss << "FAILED when invoking 'av_opt_set_int_list' for OUTPUTS! fferr=" << fferr << ".";
+        oss << "FAILED to initialize 'buffersink' filter context! fferr=" << fferr << ".";
         m_errMsg = oss.str();
         return false;
     }
