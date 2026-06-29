@@ -15,3 +15,6 @@ projects/*
 *.mep
 *.mp4
 *.mov
+dist
+/dist
+package.log

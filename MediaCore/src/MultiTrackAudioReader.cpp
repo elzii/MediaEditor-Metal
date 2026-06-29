@@ -771,7 +771,7 @@ private:
             }
 
             const AVSampleFormat out_sample_fmts[] = { m_mixOutSmpfmt, (AVSampleFormat)-1 };
-            fferr = av_opt_set_int_list(bufSinkCtx, "sample_fmts", out_sample_fmts, -1, AV_OPT_SEARCH_CHILDREN);
+            fferr = av_opt_set_bin(bufSinkCtx, "sample_fmts", (const uint8_t*)out_sample_fmts, sizeof(out_sample_fmts) - sizeof(out_sample_fmts[0]), AV_OPT_SEARCH_CHILDREN);
             if (fferr < 0)
             {
                 oss << "FAILED when invoking 'av_opt_set_int_list' for OUTPUTS! fferr=" << fferr << ".";

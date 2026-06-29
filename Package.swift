@@ -260,7 +260,7 @@ let package = Package(
                 .define("MEDIACORE_VERSION_MINOR", to: "12"),
                 .define("MEDIACORE_VERSION_PATCH", to: "25"),
                 .define("MEDIACORE_VERSION_BUILD", to: "260629"),
-                .unsafeFlags(["-Wno-nontrivial-memcall", "-Wno-deprecated-declarations", "-Wno-nan-infinity-disabled"])
+                .unsafeFlags(["-Wno-nontrivial-memcall", "-Wno-nan-infinity-disabled"])
             ]
         ),
         .executableTarget(

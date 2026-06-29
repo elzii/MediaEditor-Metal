@@ -1641,7 +1641,7 @@ bool FFOverlayBlender::SetupFilterGraph(AVPixelFormat pixfmt, uint32_t w1, uint3
         return false;
     }
     const AVPixelFormat out_pix_fmts[] = { AV_PIX_FMT_RGBA, (AVPixelFormat)-1 };
-    fferr = av_opt_set_int_list(filterCtx, "pix_fmts", out_pix_fmts, -1, AV_OPT_SEARCH_CHILDREN);
+    fferr = av_opt_set_bin(filterCtx, "pix_fmts", (const uint8_t*)out_pix_fmts, sizeof(out_pix_fmts) - sizeof(out_pix_fmts[0]), AV_OPT_SEARCH_CHILDREN);
     if (fferr < 0)
     {
         oss << "FAILED when invoking 'av_opt_set_int_list' for OUTPUTS! fferr=" << fferr << ".";

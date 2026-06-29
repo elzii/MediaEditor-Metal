@@ -3003,9 +3003,11 @@ float ImGui::BezierValue(float dt01, float P[4], int step)
     enum { STEPS = 256 };
     ImVec2 Q[4] = { { 0, 0 }, { P[0], P[1] }, { P[2], P[3] }, { 1, 1 } };
     int _step = step <= 0 ? STEPS : step;
-    ImVec2 results[_step + 1];
+    ImVec2* results = new ImVec2[_step + 1];
     bezier_table<STEPS>(Q, results);
-    return results[(int) ((dt01 < 0 ? 0 : dt01 > 1 ? 1 : dt01) * _step)].y;
+    float val = results[(int) ((dt01 < 0 ? 0 : dt01 > 1 ? 1 : dt01) * _step)].y;
+    delete[] results;
+    return val;
 }
 
 bool ImGui::BezierSelect(const char *label, const ImVec2 size, float P[5]) 
@@ -5268,7 +5270,8 @@ void ImGui::ImageInspect(const int width,
         const ImRect pickRc(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
         draw_list->AddRectFilled(pickRc.Min, pickRc.Max, 0xFF000000);
         static int zoomSize = zoom_size / 2;
-        uint32_t zoomData[(zoomSize * 2 + 1) * (zoomSize * 2 + 1)];
+        int zoomDataSize = (zoomSize * 2 + 1) * (zoomSize * 2 + 1);
+        uint32_t* zoomData = new uint32_t[zoomDataSize];
         const float quadWidth = zoomRectangleWidth / float(zoomSize * 2 + 1);
         const ImVec2 quadSize(quadWidth, quadWidth);
         const int basex = ImClamp(int(mouseUVCoord.x * width), zoomSize, width - zoomSize);
@@ -5340,6 +5343,7 @@ void ImGui::ImageInspect(const int width,
             }
             histogram(zoomSize * 2, zoomSize * 2, (const unsigned char*)zoomData);
         }
+        delete[] zoomData;
         ImGui::EndTooltip();
     }
 }
