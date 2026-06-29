@@ -13,13 +13,36 @@
 
 static NSWindow* g_MainWindow = nil;
 static bool g_WindowClosed = false;
+static std::vector<std::string> g_DroppedPaths;
 
-@interface MetalAppWindowDelegate : NSObject <NSWindowDelegate>
+@interface MetalAppWindowDelegate : NSObject <NSWindowDelegate, NSDraggingDestination>
 @end
 
 @implementation MetalAppWindowDelegate
 - (void)windowWillClose:(NSNotification *)notification {
     g_WindowClosed = true;
+}
+
+- (NSDragOperation)draggingEntered:(id <NSDraggingInfo>)sender {
+    NSPasteboard *pboard = [sender draggingPasteboard];
+    if ([[pboard types] containsObject:NSPasteboardTypeFileURL]) {
+        return NSDragOperationCopy;
+    }
+    return NSDragOperationNone;
+}
+
+- (BOOL)performDragOperation:(id <NSDraggingInfo>)sender {
+    NSPasteboard *pboard = [sender draggingPasteboard];
+    if ([[pboard types] containsObject:NSPasteboardTypeFileURL]) {
+        NSArray *urls = [pboard readObjectsForClasses:@[[NSURL class]] options:nil];
+        for (NSURL *url in urls) {
+            if (url.isFileURL) {
+                g_DroppedPaths.push_back(std::string([url.path UTF8String]));
+            }
+        }
+        return YES;
+    }
+    return NO;
 }
 @end
 
@@ -111,6 +134,8 @@ static bool Show_Splash_Window(ApplicationWindowProperty& property, ImGuiContext
             
             id<MTLCommandBuffer> commandBuffer = [commandQueue commandBuffer];
             renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 1);
+            renderPassDescriptor.colorAttachments[0].loadAction = MTLLoadActionClear;
+            renderPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
             id<MTLRenderCommandEncoder> renderEncoder = [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
             [renderEncoder pushDebugGroup:@"ImGui Splash Rendering"];
             ImGui_ImplMetal_RenderDrawData(ImGui::GetDrawData(), commandBuffer, renderEncoder);
@@ -216,6 +241,7 @@ int main(int argc, char** argv) {
         mtkView.colorPixelFormat = MTLPixelFormatBGRA8Unorm;
         mtkView.clearColor = MTLClearColorMake(0, 0, 0, 1);
         [window setContentView:mtkView];
+        [window registerForDraggedTypes:@[NSPasteboardTypeFileURL]];
         [window makeKeyAndOrderFront:nil];
         
         MetalAppWindowDelegate* windowDelegate = [[MetalAppWindowDelegate alloc] init];
@@ -257,6 +283,12 @@ int main(int argc, char** argv) {
                 ImGui_ImplOSX_NewFrame(mtkView);
                 ImGui::NewFrame();
                 
+                if (!g_DroppedPaths.empty()) {
+                    if (property.application.Application_DropFromSystem)
+                        property.application.Application_DropFromSystem(g_DroppedPaths);
+                    g_DroppedPaths.clear();
+                }
+                
                 io.DisplaySize.x = mtkView.bounds.size.width;
                 io.DisplaySize.y = mtkView.bounds.size.height;
                 CGFloat framebufferScale = window.screen.backingScaleFactor ?: NSScreen.mainScreen.backingScaleFactor;
@@ -274,6 +306,8 @@ int main(int argc, char** argv) {
                 
                 id<MTLCommandBuffer> commandBuffer = [commandQueue commandBuffer];
                 renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 1);
+                renderPassDescriptor.colorAttachments[0].loadAction = MTLLoadActionClear;
+                renderPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
                 id<MTLRenderCommandEncoder> renderEncoder = [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
                 [renderEncoder pushDebugGroup:@"ImGui Rendering"];
                 ImGui_ImplMetal_RenderDrawData(ImGui::GetDrawData(), commandBuffer, renderEncoder);

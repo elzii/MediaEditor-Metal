@@ -714,14 +714,7 @@ void ImDestroyTexture(ImTextureID* texture_ptr)
         g_tex_mutex.unlock();
         return;
     }
-    if (textureIt->CreateThread != std::this_thread::get_id())
-    {
-        textureIt->NeedDestroy = true;
-        g_tex_mutex.unlock();
-        return;
-    }
-    destroy_texture(&(*textureIt));
-    g_Textures.erase(textureIt);
+    textureIt->NeedDestroy = true;
     g_tex_mutex.unlock();
     *texture_ptr = nullptr;
 }
