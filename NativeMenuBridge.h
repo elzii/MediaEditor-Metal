@@ -7,6 +7,10 @@
 // and your main ImGui render loop reads and resets.
 struct NativeMenuState {
     std::atomic<bool> triggerAbout{false};
+    std::atomic<bool> triggerProjectNew{false};
+    std::atomic<bool> triggerProjectOpen{false};
+    std::atomic<bool> triggerProjectSave{false};
+    std::atomic<bool> triggerProjectSaveAs{false};
 };
 
 // Global or shared reference accessible across both layers

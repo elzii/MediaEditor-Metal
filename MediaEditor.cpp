@@ -18,6 +18,7 @@
 #include <application.h>
 #include <imgui.h>
 #include <imgui_helper.h>
+#include "NativeMenuBridge.h"
 #include <imgui_extra_widget.h>
 #include <imgui_json.h>
 #include <implot.h>
@@ -11844,6 +11845,61 @@ static bool MediaEditor_Frame(void * handle, bool app_will_quit)
     static ImGui::MsgBox msgbox_overwrite;
     static const char* buttons_quit[] = { "Overwrite", "Quit", "Cancel", NULL };
     msgbox_overwrite.Init("Overwrite Exist Project?", ICON_MD_WARNING, "Are you really sure you want to overwrite project?", buttons_quit, false);
+
+    if (g_NativeMenuState.triggerAbout.exchange(false))
+    {
+        show_about = true;
+    }
+
+    if (g_NativeMenuState.triggerProjectNew.exchange(false))
+    {
+        if (!project_need_save)
+        {
+            NewProject();
+        }
+        else if (g_media_editor_settings.project_path.empty())
+        {
+            show_file_dialog = true;
+            ShowSaveProjectDialogue("", IGFDUserDatas(FILE_DLG_USERDATAS__PROJECT_SAVE_THEN_NEW.c_str()));
+        }
+        else
+        {
+            ImGui::OpenPopup(ICON_FA_CIRCLE_INFO " Save Project File", ImGuiPopupFlags_AnyPopup);
+        }
+    }
+
+    if (g_NativeMenuState.triggerProjectOpen.exchange(false))
+    {
+        show_file_dialog = true;
+        std::string project_path = g_media_editor_settings.project_path.empty() ? "." : ImGuiHelper::path_url(g_media_editor_settings.project_path);
+        IGFD::FileDialogConfig config;
+        config.filePathName = project_path.c_str();
+        config.countSelectionMax = 1;
+        config.userDatas = IGFDUserDatas("ProjectOpen");
+        config.flags = ImGuiFileDialogFlags_OpenFile_Default;
+        ImGuiFileDialog::Instance()->OpenDialog("##MediaEditFileDlgKey", ICON_IGFD_FOLDER_OPEN " Open Project File", 
+                                                pfilters.c_str(),
+                                                config);
+    }
+
+    if (g_NativeMenuState.triggerProjectSave.exchange(false))
+    {
+        if (g_hProject->IsUntitled())
+        {
+            show_file_dialog = true;
+            ShowSaveProjectDialogue("", IGFDUserDatas(FILE_DLG_USERDATAS__PROJECT_SAVE.c_str()));
+        }
+        else
+        {
+            SaveProject();
+        }
+    }
+
+    if (g_NativeMenuState.triggerProjectSaveAs.exchange(false))
+    {
+        show_file_dialog = true;
+        ShowSaveProjectDialogue(g_media_editor_settings.project_path, IGFDUserDatas(FILE_DLG_USERDATAS__PROJECT_SAVE.c_str()));
+    }
 
     auto platform_io = ImGui::GetPlatformIO();
     bool is_splitter_hold = false;

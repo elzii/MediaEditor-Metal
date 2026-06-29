@@ -11,6 +11,106 @@
 #include <vector>
 #include <string>
 
+#include "NativeMenuBridge.h"
+
+NativeMenuState g_NativeMenuState;
+
+@interface MenuActionTarget : NSObject
+- (void)onAbout:(id)sender;
+- (void)onProjectNew:(id)sender;
+- (void)onProjectOpen:(id)sender;
+- (void)onProjectSave:(id)sender;
+- (void)onProjectSaveAs:(id)sender;
+@end
+
+@implementation MenuActionTarget
+- (void)onAbout:(id)sender {
+    g_NativeMenuState.triggerAbout.store(true);
+}
+- (void)onProjectNew:(id)sender {
+    g_NativeMenuState.triggerProjectNew.store(true);
+}
+- (void)onProjectOpen:(id)sender {
+    g_NativeMenuState.triggerProjectOpen.store(true);
+}
+- (void)onProjectSave:(id)sender {
+    g_NativeMenuState.triggerProjectSave.store(true);
+}
+- (void)onProjectSaveAs:(id)sender {
+    g_NativeMenuState.triggerProjectSaveAs.store(true);
+}
+@end
+
+void SetupNativeMacMenu(NSArray<NSDictionary*>* enabledCameras) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        static MenuActionTarget* target = [[MenuActionTarget alloc] init];
+        NSMenu* mainMenu = [[NSMenu alloc] init];
+        
+        NSString* appName = @"mec";
+        
+        // App Menu
+        NSMenuItem* appMenuItem = [[NSMenuItem alloc] init];
+        [mainMenu addItem:appMenuItem];
+        NSMenu* appMenu = [[NSMenu alloc] init];
+        [appMenuItem setSubmenu:appMenu];
+        
+        // About
+        NSMenuItem* aboutItem = [[NSMenuItem alloc] initWithTitle:@"About"
+                                                           action:@selector(onAbout:)
+                                                    keyEquivalent:@""];
+        [aboutItem setTarget:target];
+        [appMenu addItem:aboutItem];
+        
+        [appMenu addItem:[NSMenuItem separatorItem]];
+        
+        // Quit
+        NSMenuItem* quitItem = [[NSMenuItem alloc] initWithTitle:[@"Quit " stringByAppendingString:appName]
+                                                          action:@selector(terminate:)
+                                                   keyEquivalent:@"q"];
+        [quitItem setKeyEquivalentModifierMask:NSEventModifierFlagCommand];
+        [appMenu addItem:quitItem];
+        
+        // -- MEW TOP LEVEL MENU -----------------
+        NSMenuItem* projectItem = [[NSMenuItem alloc] initWithTitle:@"Project"
+                                                              action:nil
+                                                       keyEquivalent:@""];
+        [mainMenu addItem:projectItem];
+        NSMenu* projectMenu = [[NSMenu alloc] initWithTitle:@"AI Detection"];
+        [projectItem setSubmenu:projectMenu];
+
+        // -- MENU ITEM --------------------------
+        NSMenuItem* projectItem_New = [[NSMenuItem alloc] initWithTitle:@"New Project"
+                                                          action:@selector(onProjectNew:)
+                                                   keyEquivalent:@"n"];
+        [projectItem_New setTarget:target];
+        [projectMenu addItem:projectItem_New];
+
+        // -- MENU ITEM --------------------------
+        NSMenuItem* projectItem_Open = [[NSMenuItem alloc] initWithTitle:@"Open Project"
+                                                           action:@selector(onProjectOpen:)
+                                                    keyEquivalent:@"o"];
+        [projectItem_Open setTarget:target];
+        [projectMenu addItem:projectItem_Open];
+
+
+        // -- MENU ITEM --------------------------
+        NSMenuItem* projectItem_Save = [[NSMenuItem alloc] initWithTitle:@"Save Project"
+                                                           action:@selector(onProjectSave:)
+                                                    keyEquivalent:@"s"];
+        [projectItem_Save setTarget:target];
+        [projectMenu addItem:projectItem_Save];
+
+        // -- MENU ITEM --------------------------
+        NSMenuItem* projectItem_SaveAs = [[NSMenuItem alloc] initWithTitle:@"Save Project As"
+                                                           action:@selector(onProjectSaveAs:)
+                                                    keyEquivalent:@"S"];
+        [projectItem_SaveAs setTarget:target];
+        [projectMenu addItem:projectItem_SaveAs];
+        
+        [NSApp setMainMenu:mainMenu];
+    });
+}
+
 static NSWindow* g_MainWindow = nil;
 static bool g_WindowClosed = false;
 static std::vector<std::string> g_DroppedPaths;
@@ -246,6 +346,8 @@ int main(int argc, char** argv) {
         
         MetalAppWindowDelegate* windowDelegate = [[MetalAppWindowDelegate alloc] init];
         [window setDelegate:windowDelegate];
+        
+        SetupNativeMacMenu(nil);
         
         if (!splash_done && property.application.Application_SetupContext)
             property.application.Application_SetupContext(ctx, property.handle, false);
