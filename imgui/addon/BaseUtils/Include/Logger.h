@@ -16,6 +16,9 @@
 */
 
 #pragma once
+#ifdef DEBUG
+#undef DEBUG
+#endif
 #include <cstdint>
 #include <string>
 #include <ostream>

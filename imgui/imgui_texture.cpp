@@ -105,6 +105,15 @@ struct ImTexture
     double  TimeStamp = NAN;
     std::thread::id CreateThread;
     bool NeedDestroy  = false;
+#elif IMGUI_RENDERING_MATAL
+struct ImTexture
+{
+    void*  TextureID = nullptr;
+    int    Width     = 0;
+    int    Height    = 0;
+    double  TimeStamp = NAN;
+    std::thread::id CreateThread;
+    bool NeedDestroy  = false;
 };
 #else
 struct ImTexture
@@ -117,6 +126,15 @@ struct ImTexture
     bool NeedDestroy  = false;
 };
 #endif
+
+#if IMGUI_RENDERING_MATAL
+extern "C" {
+    void* ImGui_ImplMetal_CreateTexture(const void* data, int width, int height, int channels, int bit_depth);
+    void ImGui_ImplMetal_UpdateTexture(void* textureId, const void* data, int width, int height, int channels, int bit_depth);
+    void ImGui_ImplMetal_DestroyTexture(void* textureId);
+}
+#endif
+
 
 namespace ImGui {
 static std::vector<ImTexture> g_Textures;
@@ -190,6 +208,29 @@ void ImGenerateOrUpdateTexture(ImTextureID& imtexid,int width,int height,int cha
     else
 #endif
         ImGui_ImplVulkan_UpdateTexture(imtexid, data, width, height, channels, bit_depth);
+#elif IMGUI_RENDERING_MATAL
+    if (is_immat)
+    {
+        ImGui::ImMat* mat = (ImGui::ImMat*)pixels;
+        if (mat->empty())
+            return;
+        if (mat->device == IM_DD_CPU)
+        {
+            data = (unsigned char *)mat->data;
+        }
+    }
+    else
+        data = (unsigned char *)pixels;
+
+    if (!data)
+        return;
+
+    if (imtexid == 0)
+    {
+        imtexid = ImCreateTexture(data, width, height, channels, NAN, 8);
+        return;
+    }
+    ImGui_ImplMetal_UpdateTexture(imtexid, data, width, height, channels, 8);
 #elif IMGUI_RENDERING_DX11
     auto textureID = (ID3D11ShaderResourceView *)imtexid;
     if (textureID)
@@ -486,6 +527,24 @@ ImTextureID ImCreateTexture(const void* data, int width, int height, int channel
     texture.TimeStamp = time_stamp;
     g_tex_mutex.unlock();
     return (ImTextureID)texture.TextureID;
+#elif IMGUI_RENDERING_MATAL
+    g_tex_mutex.lock();
+    g_Textures.resize(g_Textures.size() + 1);
+    ImTexture& texture = g_Textures.back();
+    texture.TextureID = ImGui_ImplMetal_CreateTexture(data, width, height, channels, bit_depth);
+    if (!texture.TextureID)
+    {
+        g_Textures.pop_back();
+        g_tex_mutex.unlock();
+        return (ImTextureID)nullptr;
+    }
+    texture.CreateThread = std::this_thread::get_id();
+    texture.NeedDestroy = false;
+    texture.Width  = width;
+    texture.Height = height;
+    texture.TimeStamp = time_stamp;
+    g_tex_mutex.unlock();
+    return (ImTextureID)texture.TextureID;
 #elif IMGUI_RENDERING_DX11
     ID3D11Device* pd3dDevice = (ID3D11Device*)ImGui_ImplDX11_GetDevice();
     if (!pd3dDevice)
@@ -593,6 +652,8 @@ static std::vector<ImTexture>::iterator ImFindTexture(ImTextureID texture)
     auto textureID = reinterpret_cast<ImTextureVk>(texture);
 #elif IMGUI_RENDERING_DX11
     auto textureID = (ID3D11ShaderResourceView *)texture;
+#elif IMGUI_RENDERING_MATAL
+    void* textureID = texture;
 #elif IMGUI_RENDERING_DX9
     auto textureID = reinterpret_cast<LPDIRECT3DTEXTURE9>(texture);
 #elif IMGUI_OPENGL
@@ -624,6 +685,12 @@ static void destroy_texture(ImTexture* tex)
     if (tex->TextureID)
     {
         tex->TextureID->Release();
+        tex->TextureID = nullptr;
+    }
+#elif IMGUI_RENDERING_MATAL
+    if (tex->TextureID)
+    {
+        ImGui_ImplMetal_DestroyTexture(tex->TextureID);
         tex->TextureID = nullptr;
     }
 #elif IMGUI_OPENGL
