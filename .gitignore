@@ -18,3 +18,4 @@ projects/*
 dist
 /dist
 package.log
+MEMORY.md
