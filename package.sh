@@ -8,7 +8,6 @@ APP_BUNDLE="${DIST_DIR}/${APP_NAME}.app"
 CONTENTS_DIR="${APP_BUNDLE}/Contents"
 MACOS_DIR="${CONTENTS_DIR}/MacOS"
 RESOURCES_DIR="${CONTENTS_DIR}/Resources"
-FRAMEWORKS_DIR="${CONTENTS_DIR}/Frameworks"
 
 # 1. Clean and Build
 echo "Building ${APP_NAME}..."
@@ -20,7 +19,6 @@ echo "Creating App Bundle structure..."
 rm -rf "${DIST_DIR}"
 mkdir -p "${MACOS_DIR}"
 mkdir -p "${RESOURCES_DIR}"
-mkdir -p "${FRAMEWORKS_DIR}"
 
 # 3. Copy Binary
 cp "${BINARY_PATH}" "${MACOS_DIR}/"
@@ -30,43 +28,6 @@ echo "Copying internal resources..."
 if [ -f "resources/mec_logo.icns" ]; then
     cp "resources/mec_logo.icns" "${RESOURCES_DIR}/"
 fi
-
-# 4a. Copy Frameworks (dylibs) and fix load paths recursively
-echo "Copying external dynamic library dependencies..."
-copy_and_fix_deps() {
-    local target="$1"
-    echo "Resolving dependencies for: $(basename "$target")"
-    
-    # Get dependencies starting with /opt/homebrew/
-    local deps=$(otool -L "$target" | grep -o '/opt/homebrew/[^ ]*' || true)
-    for dep in $deps; do
-        # Resolve symlink to actual file if necessary
-        local real_dep=$(python3 -c "import os, sys; print(os.path.realpath(sys.argv[1]))" "$dep")
-        local dep_name=$(basename "$real_dep")
-        local dest_dep="${FRAMEWORKS_DIR}/${dep_name}"
-        
-        if [ ! -f "$dest_dep" ]; then
-            echo "  Copying $dep_name to Frameworks..."
-            cp "$real_dep" "$dest_dep"
-            chmod +w "$dest_dep"
-            install_name_tool -id "@rpath/$dep_name" "$dest_dep"
-            # Recursively copy dependencies for this library
-            copy_and_fix_deps "$dest_dep"
-        fi
-        
-        # Change the reference in the target to point to @rpath
-        local orig_dep_name=$(basename "$dep")
-        install_name_tool -change "$dep" "@rpath/$orig_dep_name" "$target"
-    done
-}
-
-# Add @executable_path/../Frameworks to the main binary's rpaths
-echo "Configuring rpaths for main binary..."
-if ! otool -l "${MACOS_DIR}/${APP_NAME}" | grep -q "path @executable_path/../Frameworks"; then
-    install_name_tool -add_rpath "@executable_path/../Frameworks" "${MACOS_DIR}/${APP_NAME}"
-fi
-
-copy_and_fix_deps "${MACOS_DIR}/${APP_NAME}"
 
 # 5. Create Info.plist
 echo "Generating Info.plist..."
@@ -198,14 +159,6 @@ if [ -z "${IDENTITY}" ]; then
 fi
 
 echo "Codesigning with identity: ${IDENTITY}"
-# Codesign each nested dynamic library first
-for lib in "${FRAMEWORKS_DIR}"/*.dylib; do
-    if [ -f "$lib" ] && [ ! -L "$lib" ]; then
-        echo "Codesigning library: $lib"
-        codesign --force --sign "${IDENTITY}" "$lib"
-    fi
-done
-
 echo "Codesigning App Bundle..."
 codesign --force --deep --options runtime --entitlements resources/entitlements.plist --sign "${IDENTITY}" "${APP_BUNDLE}"
 
