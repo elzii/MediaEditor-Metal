@@ -52,7 +52,8 @@ let package = Package(
                 .define("ImMaskCreator_VERSION_MAJOR", to: "1"),
                 .define("ImMaskCreator_VERSION_MINOR", to: "0"),
                 .define("ImMaskCreator_VERSION_PATCH", to: "0"),
-                .define("ImMaskCreator_VERSION_BUILD", to: "0")
+                .define("ImMaskCreator_VERSION_BUILD", to: "0"),
+                .unsafeFlags(["-Wno-nontrivial-memcall", "-Wno-nan-infinity-disabled"])
             ]
         ),
         .target(
@@ -144,7 +145,8 @@ let package = Package(
                 .define("IMGUI_FONT_WEIHEI", to: "1"),
                 .define("IMGUI_FONT_MONONARROW", to: "1"),
                 .define("IMGUI_ICONS", to: "1"),
-                .define("IMGUI_USER_CONFIG", to: "\"imconfig.h\"")
+                .define("IMGUI_USER_CONFIG", to: "\"imconfig.h\""),
+                .unsafeFlags(["-Wno-nontrivial-memcall", "-Wno-deprecated-declarations", "-Wno-vla-cxx-extension", "-Wno-nan-infinity-disabled"])
             ]
         ),
         .target(
@@ -186,7 +188,8 @@ let package = Package(
                 .headerSearchPath("../imgui/addon/ImGuiStyleSerializer"),
                 .headerSearchPath("src/BuildInNodes"),
                 .headerSearchPath("src/BuildInNodes/CommonNode"),
-                .headerSearchPath("src/BuildInNodes/SystemNode")
+                .headerSearchPath("src/BuildInNodes/SystemNode"),
+                .unsafeFlags(["-Wno-nontrivial-memcall", "-Wno-nan-infinity-disabled"])
             ]
         ),
         .target(
@@ -256,7 +259,8 @@ let package = Package(
                 .define("MEDIACORE_VERSION_MAJOR", to: "1"),
                 .define("MEDIACORE_VERSION_MINOR", to: "12"),
                 .define("MEDIACORE_VERSION_PATCH", to: "25"),
-                .define("MEDIACORE_VERSION_BUILD", to: "260629")
+                .define("MEDIACORE_VERSION_BUILD", to: "260629"),
+                .unsafeFlags(["-Wno-nontrivial-memcall", "-Wno-deprecated-declarations", "-Wno-nan-infinity-disabled"])
             ]
         ),
         .executableTarget(
@@ -313,10 +317,11 @@ let package = Package(
                 .define("MEDIAEDITOR_VERSION_MINOR", to: "9"),
                 .define("MEDIAEDITOR_VERSION_PATCH", to: "9"),
                 .define("MEDIAEDITOR_VERSION_BUILD", to: "260629"),
-                .define("APP_NAME", to: "\"mec\"")
+                .define("APP_NAME", to: "\"mec\""),
+                .unsafeFlags(["-Wno-nontrivial-memcall", "-Wno-nan-infinity-disabled"])
             ],
             linkerSettings: [
-                .unsafeFlags(["-L/opt/homebrew/lib"]),
+                .unsafeFlags(["-L/opt/homebrew/lib", "-Xlinker", "-w"]),
                 .linkedLibrary("avcodec"),
                 .linkedLibrary("avformat"),
                 .linkedLibrary("avutil"),
